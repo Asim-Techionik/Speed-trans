@@ -1,4 +1,4 @@
-from .views import RegisterUserView, LoginView, InviteUserView, CustomPasswordResetConfirmView, ListDispatchersView, ListDriversView, DeleteUserView, CreateLoadView, ListLoadsView, ListUnassignedLoadsView, ListAssignedLoadsView, CreateAssignmentView, IndividualChatView, CheckInView, CheckOutView
+from .views import RegisterUserView, LoginView, InviteUserView, CustomPasswordResetConfirmView, ListDispatchersView, ListDriversView, DeleteUserView, CreateLoadView, ListLoadsView, ListUnassignedLoadsView, ListAssignedLoadsView, CreateAssignmentView, IndividualChatView, CheckInView, CheckOutView, DriverWorkHoursView, CheckedInButNotCheckedOutView, TotalLoadsView, TopDriversView, EditDispatcherView, EditDriverView
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
@@ -41,6 +41,17 @@ urlpatterns = [
 
     path('check-in/', CheckInView.as_view(), name='check_in'),
     path('check-out/', CheckOutView.as_view(), name='check_out'),
+
+    path('driver-hours/', DriverWorkHoursView.as_view(), name='driver-hours'),
+
+    path('drivers-checked-in/', CheckedInButNotCheckedOutView.as_view(), name='drivers-checked-in'),
+
+    path('total-loads/', TotalLoadsView.as_view(), name='total-loads'),  # Add the endpoint for total loads
+
+    path('top-drivers/', TopDriversView.as_view(), name='top-drivers'),
+
+    path('edit-dispatcher/<int:user_id>/', EditDispatcherView.as_view(), name='edit-dispatcher'),
+    path('edit-driver/<int:user_id>/', EditDriverView.as_view(), name='edit-driver'),
 
 ]
 

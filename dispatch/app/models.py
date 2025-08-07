@@ -38,6 +38,12 @@ class CustomUser(AbstractUser):
     phone_number = models.CharField(max_length=15, blank=True, null=True)
     username = models.CharField(max_length=150, unique=True, blank=True, null=True)
     location_branch = models.CharField(max_length=255, blank=True, null=True)
+    years_experience = models.CharField(max_length=255, blank=True, null=True)
+    employee_id = models.CharField(max_length=255, blank=True, null=True)
+    id_card = models.FileField(upload_to='id_card/', blank=True, null=True)
+    work_certification = models.FileField(upload_to='work_certification/', blank=True, null=True)
+    training_certification = models.FileField(upload_to='training_certification/', blank=True, null=True)
+
 
     # Fields for Drivers
     phone_number_driver = models.CharField(max_length=15, blank=True, null=True)
@@ -192,5 +198,22 @@ class CheckInOut(models.Model):
 
     def __str__(self):
         return f"CheckInOut for {self.driver.email} at {self.created_at}"
+
+    def total_hours_worked(self):
+        if self.check_in_time and self.check_out_time:
+            duration = self.check_out_time - self.check_in_time
+            return duration.total_seconds() / 3600  # Convert seconds to hours
+        return 0
+
+
+
+# class CheckInOut(models.Model):
+#     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="check_in_outs")  # Changed 'driver' to 'user'
+#     check_in_time = models.DateTimeField(null=True, blank=True)
+#     check_out_time = models.DateTimeField(null=True, blank=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#
+#     def __str__(self):
+#         return f"CheckInOut for {self.user.email} at {self.created_at}"
 
 

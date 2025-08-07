@@ -141,3 +141,40 @@ class CheckInOutSerializer(serializers.ModelSerializer):
     class Meta:
         model = CheckInOut
         fields = ['id', 'driver', 'check_in_time', 'check_out_time', 'created_at']
+
+# class CheckInOutSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = CheckInOut
+#         fields = ['id', 'user', 'check_in_time', 'check_out_time', 'created_at']
+
+
+class CheckInOutSerializer(serializers.ModelSerializer):
+    total_hours_worked = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CheckInOut
+        fields = ['id', 'driver', 'check_in_time', 'check_out_time', 'created_at', 'total_hours_worked']
+
+    def get_total_hours_worked(self, obj):
+        if obj.check_out_time and obj.check_in_time:
+            # Calculate the difference between check-in and check-out times
+            duration = obj.check_out_time - obj.check_in_time
+            return str(duration.total_seconds() / 3600)  # Convert seconds to hours
+        return 0
+
+# Dispatcher Serializer
+class DispatcherSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['profile', 'first_name', 'last_name', 'email', 'gender', 'dob', 'address',
+                  'phone_number', 'username', 'location_branch', 'years_experience', 'employee_id',
+                  'id_card', 'work_certification', 'training_certification']
+
+# Driver Serializer
+class DriverSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['profile', 'first_name', 'last_name', 'email', 'gender', 'dob', 'address',
+                  'phone_number_driver', 'total_loads', 'completed_loads', 'license_number',
+                  'license_expiry', 'vehicle_type', 'vehicle_plate_no', 'driver_license',
+                  'vehicle_registration']

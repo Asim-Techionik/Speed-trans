@@ -6,7 +6,7 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import RegisterSerializer, DispatcherListSerializer, DriverListSerializer, LoadSerializer, AssignmentSerializer, MessageSerializer, CheckInOutSerializer
+from .serializers import RegisterSerializer, DispatcherListSerializer, DriverListSerializer, LoadSerializer, AssignmentSerializer, MessageSerializer, CheckInOutSerializer, DriverSerializer, DispatcherSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.contrib.auth import authenticate
@@ -19,11 +19,12 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.forms import SetPasswordForm
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
-from .models import Load, Message, CheckInOut
+from .models import Load, Message, CheckInOut, Assignment
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
 from django.db.models import Q  # You also need to import Q for filtering
 from django.utils import timezone
+from datetime import datetime, timedelta
 
 
 
@@ -528,3 +529,283 @@ class CheckOutView(APIView):
         # Serialize and return the updated check-in/out data
         serializer = CheckInOutSerializer(check_in_out)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+# class CheckInView(APIView):
+#     permission_classes = [IsAuthenticated]
+#
+#     def post(self, request):
+#         # Ensure the user is either a driver or dispatcher
+#         if request.user.user_type not in ['driver', 'dispatcher']:
+#             return Response({"detail": "You do not have permission to check in."}, status=status.HTTP_403_FORBIDDEN)
+#
+#         # Create a check-in record
+#         check_in = CheckInOut.objects.create(
+#             user=request.user,  # Automatically assign the authenticated user (either driver or dispatcher)
+#             check_in_time=timezone.now()
+#         )
+#
+#         # Serialize and return the check-in data
+#         serializer = CheckInOutSerializer(check_in)
+#         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+# class CheckOutView(APIView):
+#     permission_classes = [IsAuthenticated]
+#
+#     def post(self, request):
+#         # Ensure the user is either a driver or dispatcher
+#         if request.user.user_type not in ['driver', 'dispatcher']:
+#             return Response({"detail": "You do not have permission to check out."}, status=status.HTTP_403_FORBIDDEN)
+#
+#         # Get the user's active check-in record
+#         check_in_record = CheckInOut.objects.filter(
+#             user=request.user,
+#             check_out_time__isnull=True  # Ensure we're updating the active check-in record
+#         ).first()
+#
+#         if not check_in_record:
+#             return Response({"detail": "No active check-in found."}, status=status.HTTP_400_BAD_REQUEST)
+#
+#         # Update the check-out time
+#         check_in_record.check_out_time = timezone.now()
+#         check_in_record.save()
+#
+#         # Serialize and return the updated check-in data
+#         serializer = CheckInOutSerializer(check_in_record)
+#         return Response(serializer.data, status=status.HTTP_200_OK)
+
+#
+# class DriverWorkHoursView(APIView):
+#     permission_classes = [IsAuthenticated]
+#
+#     def get(self, request):
+#         today = datetime.today()
+#
+#         # Filter options
+#         filter_type = request.query_params.get('filter', 'today')  # Default filter is 'today'
+#         start_date = None
+#         end_date = None
+#
+#         if filter_type == 'today':
+#             start_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
+#             end_date = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+#
+#         elif filter_type == 'week':
+#             start_date = today - timedelta(days=today.weekday())  # Monday of this week
+#             end_date = start_date + timedelta(days=6, hours=23, minutes=59, seconds=59)
+#
+#         elif filter_type == 'month':
+#             start_date = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+#             end_date = today.replace(day=1, hour=23, minute=59, second=59, microsecond=999999) + timedelta(days=31)
+#             end_date = end_date.replace(day=1) - timedelta(seconds=1)  # End of the month
+#
+#         # Get all drivers
+#         drivers = User.objects.filter(user_type='driver')
+#
+#         # Initialize a response list
+#         driver_hours = []
+#
+#         for driver in drivers:
+#             # Filter check-in/check-out times for each driver within the defined date range
+#             queryset = CheckInOut.objects.filter(driver=driver, check_in_time__range=[start_date, end_date])
+#
+#             # Calculate the total hours worked by summing up the durations
+#             total_hours = sum([check_in_out.total_hours_worked() for check_in_out in queryset])
+#
+#             # Add driver's worked hours to the response list
+#             driver_hours.append({
+#                 'driver_id': driver.id,
+#                 'driver_email': driver.email,
+#                 'total_hours_worked': total_hours
+#             })
+#
+#         return Response(driver_hours, status=status.HTTP_200_OK)
+
+class DriverWorkHoursView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = datetime.today()
+
+        # Filter options
+        filter_type = request.query_params.get('filter', 'today')  # Default filter is 'today'
+        start_date = None
+        end_date = None
+
+        # Handle the different filter types: today, week, month
+        if filter_type == 'today':
+            start_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        elif filter_type == 'week':
+            start_date = today - timedelta(days=today.weekday())  # Monday of this week
+            end_date = start_date + timedelta(days=6, hours=23, minutes=59, seconds=59)
+
+        elif filter_type == 'month':
+            start_date = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_date = today.replace(day=1, hour=23, minute=59, second=59, microsecond=999999) + timedelta(days=31)
+            end_date = end_date.replace(day=1) - timedelta(seconds=1)  # End of the month
+
+        else:
+            return Response({"detail": "Invalid filter type. Choose 'today', 'week', or 'month'."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Get all drivers
+        drivers = User.objects.filter(user_type='driver')
+
+        # Initialize a response list to store the worked hours of each driver
+        driver_hours = []
+
+        for driver in drivers:
+            # Filter check-in/check-out times for each driver within the defined date range
+            queryset = CheckInOut.objects.filter(driver=driver, check_in_time__range=[start_date, end_date])
+
+            # Calculate the total hours worked by summing up the durations
+            total_hours = sum([check_in_out.total_hours_worked() for check_in_out in queryset])
+
+            # Add driver's worked hours to the response list
+            driver_hours.append({
+                'driver_id': driver.id,
+                'driver_email': driver.email,
+                'total_hours_worked': total_hours
+            })
+
+        return Response(driver_hours, status=status.HTTP_200_OK)
+
+
+class CheckedInButNotCheckedOutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get the total number of drivers
+        total_drivers = User.objects.filter(user_type='driver').count()
+
+        # Get the drivers who have checked in but not checked out
+        checked_in_drivers = CheckInOut.objects.filter(check_out_time__isnull=True).values('driver').distinct()
+
+        # Count the number of drivers who are checked in
+        checked_in_count = checked_in_drivers.count()
+
+        # Response data
+        response_data = {
+            'total_drivers': total_drivers,
+            'checked_in_drivers': checked_in_count
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
+class TotalLoadsView(APIView):
+    permission_classes = [IsAuthenticated]  # Ensure the user is authenticated
+
+    def get(self, request):
+        # Count the total number of loads
+        total_loads = Load.objects.count()
+
+        # Return the count of loads
+        return Response({"total_loads": total_loads}, status=status.HTTP_200_OK)
+
+
+class TopDriversView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get the filter type from query params
+        filter_type = request.query_params.get('filter', 'today')  # Default filter is 'today'
+
+        today = datetime.today()
+
+        # Define date ranges based on the filter type
+        if filter_type == 'today':
+            start_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        elif filter_type == 'week':
+            start_date = today - timedelta(days=today.weekday())  # Start of the week (Monday)
+            end_date = start_date + timedelta(days=6, hours=23, minutes=59, seconds=59)
+
+        elif filter_type == 'month':
+            start_date = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)  # First day of the month
+            # Get the last day of the month
+            end_date = (start_date.replace(month=start_date.month % 12 + 1, day=1) - timedelta(seconds=1))
+
+        else:
+            return Response({"detail": "Invalid filter type. Use 'today', 'week', or 'month'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Fetch drivers and their total worked hours for the selected period
+        drivers = User.objects.filter(user_type='driver')
+
+        # Initialize the response list
+        top_drivers = []
+
+        for driver in drivers:
+            # Filter the check-in/out data for each driver within the date range
+            check_in_outs = CheckInOut.objects.filter(
+                driver=driver,
+                check_in_time__gte=start_date,
+                check_out_time__lte=end_date
+            )
+
+            # Calculate total hours worked
+            total_hours = sum([check_in_out.total_hours_worked() for check_in_out in check_in_outs])
+
+            # Add driver and total hours worked to the response list
+            top_drivers.append({
+                'driver_id': driver.id,
+                'driver_email': driver.email,
+                'total_hours_worked': total_hours
+            })
+
+        # Sort the list to get the top 5 drivers by total hours worked
+        top_drivers = sorted(top_drivers, key=lambda x: x['total_hours_worked'], reverse=True)[:5]
+
+        return Response(top_drivers, status=status.HTTP_200_OK)
+
+
+class EditDispatcherView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]  # Only Admin can edit Dispatcher
+
+    def get(self, request, user_id):
+        try:
+            dispatcher = User.objects.get(id=user_id, user_type='dispatcher')
+        except User.DoesNotExist:
+            return Response({"detail": "Dispatcher not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = DispatcherSerializer(dispatcher)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, user_id):
+        try:
+            dispatcher = User.objects.get(id=user_id, user_type='dispatcher')
+        except User.DoesNotExist:
+            return Response({"detail": "Dispatcher not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = DispatcherSerializer(dispatcher, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()  # Update the dispatcher details
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class EditDriverView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]  # Only Admin can edit Driver
+
+    def get(self, request, user_id):
+        try:
+            driver = User.objects.get(id=user_id, user_type='driver')
+        except User.DoesNotExist:
+            return Response({"detail": "Driver not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = DriverSerializer(driver)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, user_id):
+        try:
+            driver = User.objects.get(id=user_id, user_type='driver')
+        except User.DoesNotExist:
+            return Response({"detail": "Driver not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = DriverSerializer(driver, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()  # Update the driver details
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
